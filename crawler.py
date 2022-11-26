@@ -7,35 +7,55 @@ from bs4 import BeautifulSoup
 
 # raise exception if status_code is not 200
 base_URL: str = 'https://lightnovelreader.me/only-i-am-a-necromancer/chapter-'
-book_title: str = 'only-i-a-necromancer'
+book_title: str = 'only-i-a-necromancer-html'
 
 
 def downloadChapter(url: str, chapter: int) -> str:
-    """ The code above does the following:
-1. It takes a URL and chapter number as input
-2. It then downloads the HTML of the page
-3. It then parses the HTML to get the text of the chapter
-4. It then deletes all occurences of "sponsored content"
-5. It then replaces all fullstops with a fullstop and a newline character
-6. It returns the text of the chapter """
+
     r = requests.get(url+str(chapter))
     r.raise_for_status()
     soup = BeautifulSoup(r.text, 'html.parser')
-    text = soup.find('div', id='chapterText').get_text()
+    div = soup.find('div', id='chapterText')
+    return div
+
+
+def textChapter(div) -> str:
+
+    text = div.get_text()
     # delete all occurences of 'SPONSORED CONTENT' in the text and ignore case
     text = text.lower().replace('sponsored content', '')
     text = text.replace(".", ".\n")
     return text
 
 
+def cleanChapter(div):
+
+    extraContents = div.findAll('p')
+    extraContents += div.findAll('center')
+    extraContents += div.findAll('div', class_='hidden')
+    for content in extraContents:
+        content.extract()
+
+    # add header 2  to the beginging  of div
+    return div
+
+
 def writeChapter(book_title: str, text: str, chapter: int):
-    """ The code above does the following, explained in English:
-1. Creates a file called 'chapter_1.tex' in the folder 'book_title'
-2. Writes the text "\section{chapter 1}" to the file
-3. Writes the text 'text' to the file """
     with open(f"{book_title}/chapter_{chapter}.tex", 'w', encoding="utf-8") as f:
         f.write('\section{chapter '+str(chapter)+'}\n')
         f.write(text)
+
+
+HTML_DOC = """
+              <html>
+               <head>
+                   <title> Add new Tag </title>
+               </head>
+               <body>
+                       <div id='chapters'> This is a paragraph. </div>
+               </body>
+             </html>
+            """
 
 
 def downloadBook(base_URL: str, book_title: str):
@@ -46,12 +66,22 @@ def downloadBook(base_URL: str, book_title: str):
 4. Download the second chapter of the book
 5. Save the second chapter of the book
 6. Repeat steps 4-5 until there are no more chapters """
-    os.mkdir(book_title)
-    chapter: int = 1
-    while True:
-        text: str = downloadChapter(base_URL, chapter)
-        writeChapter(book_title, text, chapter)
+    # os.mkdir(book_title)
+
+    chapter: int = 332
+    soup = BeautifulSoup(HTML_DOC, "html.parser")
+    body = soup.find('div', id='chapters')
+    while chapter < 512:
+        content = downloadChapter(base_URL, chapter)
+        content = cleanChapter(content)
+        h2 = soup.new_tag("h2", id="chapter"+str(chapter))
+        h2.string = "Chapter " + str(chapter)
+        body.append(h2)
+        body.append(content)
         chapter += 1
+
+    # with open(f"only-i-a-necromancer-html/{book_title}.html", 'w', encoding="utf-8") as f:
+    #     f.write(str(soup))
 
 
 downloadBook(base_URL, book_title)
